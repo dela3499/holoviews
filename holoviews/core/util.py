@@ -1163,22 +1163,26 @@ def arglexsort(arrays):
 
 def get_dynamic_item(map_obj, dimensions, key):
     """
-    Looks up an item in a DynamicMap given a list of dimensions
-    and a corresponding key. The dimensions must be a subset
-    of the map_obj key dimensions.
+    Traverses the supplied object selecting the requested key on
+    all HoloMap and DynamicMap objects.
     """
-    dmaps = map_obj.traverse(lambda x: x, ['DynamicMap'])
-    dmap = dmaps[0] if dmaps else map_obj
-    if key == () and (not dimensions or not dmap.kdims):
-        map_obj.traverse(lambda x: x[()], ['DynamicMap'])
-        return key, map_obj.map(lambda x: x.last, ['DynamicMap'])
-    elif isinstance(key, tuple):
-        dims = {d.name: k for d, k in zip(dimensions, key)
-                if d in map_obj.kdims}
-        key = tuple(dims.get(d.name) for d in map_obj.kdims)
-        el = map_obj.select(['DynamicMap', 'HoloMap'], **dims)
+    map_specs = ('HoloMap', 'DynamicMap')
+    overlay_specs = ('Overlay', 'NdOverlay')
+    if any(map_obj.matches(spec) for spec in map_specs):
+        if key == ():
+            el = map_obj[key]
+        else:
+            dims = {d.name: k for d, k in zip(dimensions, key)
+                    if d in map_obj.kdims}
+            key = tuple(dims.get(d.name) for d in map_obj.kdims)
+            el = map_obj.select(map_specs, **dims)
+    elif map_obj._deep_indexable and not any(map_obj.matches(spec) for spec in overlay_specs):
+        el = map_obj.clone(shared_data=False)
+        for k, v in map_obj.data.items():
+            _, deep_obj = get_dynamic_item(v, dimensions, key)
+            el[k] = deep_obj
     else:
-        el = None
+        el = map_obj
     return key, el
 
 

@@ -759,6 +759,27 @@ class DynamicMap(HoloMap):
         self.data[key] = val
 
 
+    def map(self, map_fn, specs=None, clone=True):
+        """
+        Recursively replaces elements using a map function when the
+        specification applies.
+        """
+        if specs and not isinstance(specs, list): specs = [specs]
+        applies = specs is None or any(self.matches(spec) for spec in specs)
+
+        if applies:
+            deep_mapped = map_fn(self)
+        else:
+            deep_mapped = self.clone() if clone else self
+        for k, v in deep_mapped.data.items():
+            deep_mapped[k] = v.map(map_fn, specs, clone)
+
+        from ..util import Dynamic
+        def dynamic_map(obj):
+            return obj.map(map_fn, specs, clone)
+        return Dynamic(deep_mapped, shared_data=True, operation=dynamic_map)
+
+
     def relabel(self, label=None, group=None, depth=1):
         """
         Assign a new label and/or group to an existing LabelledData
